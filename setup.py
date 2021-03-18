@@ -16,7 +16,7 @@ with open("README.md", "r") as fh:
 
 requirements = read_multiline_as_list("requirements.txt")
 
-classifiers = read_multiline_as_list("classifiers.txt")
+# classifiers = read_multiline_as_list("classifiers.txt")
 
 description = (
     "Python alternative to download git annexed files programatically from "
@@ -34,7 +34,7 @@ setuptools.setup(
     url="https://github.com/TeiaLabs/git-annex-file-downloader/",
     packages=setuptools.find_packages(where="src"),
     package_dir={"": "src"},
-    classifiers=classifiers,
+    # classifiers=classifiers,
     keywords='git annex special remote, s3, azure blob storage, python bindings',
     entry_points={
         'console_scripts': [
