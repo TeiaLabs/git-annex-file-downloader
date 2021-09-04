@@ -25,7 +25,7 @@ description = (
 
 setuptools.setup(
     name="git-annex-file-downloader",
-    version="1.0.0",
+    version="1.1.0",
     author="Nei Cardoso de Oliveira Neto @ Teia Labs",
     author_email="nei@teialabs.com",
     description=description,

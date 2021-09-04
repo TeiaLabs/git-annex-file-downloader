@@ -36,12 +36,26 @@ def expand_paths(paths: Iterable[Path]) -> Iterator[Path]:
     return files
 
 
+def expand_paths_from_json(paths: Iterable[Path], json_path: Path | str) -> Iterable[Path]:
+    mapping = utils.load_json(json_path)
+    # all_available_paths = [Path(k) for k in mapping.keys()]
+    all_available_paths: list[str] = list(mapping.keys())
+    expanded_paths = []
+    for p in paths:
+        for available_path in all_available_paths:
+            if available_path.startswith(str(p)):
+                expanded_paths.append(available_path)
+    return expanded_paths
+
+
 def main():
     args = cli_args.get_args()
     if args.no_annex:
-        logger.info("Downloading files without git-annex")
+        logger.info("Working without git-annex")
+        files = expand_paths_from_json(args.files, "large_files.json")
+    else:
+        files = expand_paths(args.files)
     logger.debug(f"From {args.store}.")
-    files = expand_paths(args.files)
     if args.store == "aws-s3":
         download(files, amazon_s3.download_file, [args.no_annex], args.workers)
     elif args.store == "azure-blob":
