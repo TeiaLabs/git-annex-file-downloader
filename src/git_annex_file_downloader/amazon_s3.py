@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import base64
+import os
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional
 
 import boto3
+from dotenv import load_dotenv
 
 from . import loggers, utils
 from .utils import raise_if_none, run_command, run_command_chain
 
+load_dotenv()
 logger = loggers.get_logger()
 
 
@@ -20,7 +25,7 @@ class args:
 
 @raise_if_none
 def choose_remote(
-    remotes_configs: List[str], remote_name: str
+    remotes_configs: list[str], remote_name: str
 ) -> Optional[str]:
     for remote in remotes_configs:
         if remote_name in remote:
@@ -28,10 +33,7 @@ def choose_remote(
     return None
 
 
-def decrypt_file(file_path: Union[Path, str], output_path: Union[Path, str]):
-    remotes = get_remotes_config()
-    special_remote = choose_remote(remotes, args.remote_name)
-    cipher = get_cipher(special_remote)
+def decrypt_file(cipher: str, file_path: Path | str, output_path: Path | str):
     decryption_cipher = get_decryption_cipher(cipher).decode()
     run_command(
         f"gpg --quiet --batch --passphrase {decryption_cipher} --output - {file_path}",
@@ -48,7 +50,7 @@ def download_from_s3(bucket_name: str, file_name: str, prefix: str):
 
 
 def encrypt_key(
-    annex_key: str, hmac_cipher: str, mac_algo: str = args.mac_algo
+    annex_key: str, hmac_cipher: str, mac_algo: str
 ) -> str:
     commands = [
         f"echo -n '{annex_key}'",
@@ -69,20 +71,23 @@ def get_cipher(remote_config: str) -> Optional[str]:
     return None
 
 
+def get_cipher_from_remote_config(remote_name: str) -> str:
+    remotes = get_remotes_config()
+    special_remote = choose_remote(remotes, remote_name)
+    cipher = get_cipher(special_remote)
+    return cipher
+
+
 def get_decryption_cipher(full_cipher: str) -> bytes:
     decoded = base64.decodebytes(full_cipher.encode())
     return decoded[256:-1]
 
 
-def get_encrypted_key(file_path: Path) -> str:
-    annex_key = utils.lookup_key(file_path)
-    remotes = get_remotes_config()
-    special_remote = choose_remote(remotes, args.remote_name)
-    cipher = get_cipher(special_remote)
+def get_encrypted_key(cipher: str, clear_text_key: str, mac_algorithm: str) -> str:
     hmac_cipher = get_hmac_cipher(cipher)
-    partial_encrypted_key = encrypt_key(annex_key, hmac_cipher)
+    partial_encrypted_key = encrypt_key(clear_text_key, hmac_cipher, mac_algorithm)
     partial_encrypted_key = partial_encrypted_key.strip("\n")
-    full_encrypted_key = f"GPG{args.mac_algo}--{partial_encrypted_key}"
+    full_encrypted_key = f"GPG{mac_algorithm}--{partial_encrypted_key}"
     return full_encrypted_key
 
 
@@ -94,20 +99,32 @@ def get_hmac_cipher(b64_full_cipher: str) -> str:
     return string_hmac_cipher
 
 
-def get_remotes_config() -> List[str]:
+def get_remotes_config() -> list[str]:
     cmd = f"git show git-annex:remote.log"
     return run_command(cmd).split("\n")
 
 
-def lookup_download_decrypt(file_path: Path):
+def download_file(file_path: Path, no_annex: bool = False):
+    """Lookup, download, decrypt."""
     destination_path = file_path.resolve()
-    file_size = utils.get_file_size_from_key(lookup_key(file_path))
+    if no_annex:
+        annex_key = utils.lookup_key_from_json(file_path, "large_files.json")
+    else:
+        if file_path.is_symlink():
+            annex_key = utils.lookup_key(file_path)
+        else:
+            raise ValueError(f"'{file_path}' is not a symlink. Maybe --no-annex?")
+    file_size = utils.get_file_size_from_key(annex_key)
     if not utils.needs_download(destination_path, file_size):
         logger.info(f"Skipping already downloaded \n\t '{file_path}'.")
     else:
-        enc_key = get_encrypted_key(file_path)
+        if no_annex:
+            cipher = os.environ["GIT_ANNEX_CIPHER"]
+        else:
+            cipher = get_cipher_from_remote_config(args.remote_name)
+        enc_key = get_encrypted_key(cipher, annex_key, args.mac_algo)
         logger.info(f"Downloading '{file_path}'...")
         download_from_s3(args.bucket, enc_key, args.prefix)
         utils.mkdirs(destination_path)
-        decrypt_file(f"/tmp/{enc_key}", destination_path)
+        decrypt_file(cipher, f"/tmp/{enc_key}", destination_path)
     logger.info(f"ok")

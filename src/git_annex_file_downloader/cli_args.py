@@ -1,31 +1,19 @@
-from argparse import ArgumentParser, Namespace
 from pathlib import Path
+from typing import List, Literal
 
-CLIargs = Namespace
+from tap import Tap as TypedArgumentParser
 
 
-def get_args() -> CLIargs:
+class GadownArgParser(TypedArgumentParser):
+    """Download files uploaded with git-annex."""
+    files: List[Path]  # Files to download.
+    store: Literal["azure-blob", "aws-s3"] = "aws-s3"  # Cloud storage provider.
+    no_annex: bool = False  # Use alternative data sources for annex metadata? 
+    workers: int = 1  # Number of parallel downloads.
+
+
+def get_args() -> GadownArgParser:
     """Get user input from the command-line and parse it."""
-    parser = ArgumentParser(description="Download files uploaded with git-annex.")
-    parser.add_argument(
-        "files",
-        help="Files to download.",
-        nargs='+',
-        type=Path,
-    )
-    parser.add_argument(
-        "-c",
-        "--cloud_provider",
-        choices=["azure", "s3"],
-        default="s3",
-        help="Cloud storage provider to use.",
-        type=str,
-    )
-    parser.add_argument(
-        "--not_symlinks",
-        action="store_true",
-        default=False,
-        help="Use paths that are not symlinks?",
-    )
+    parser = GadownArgParser(underscores_to_dashes=True)
     args = parser.parse_args()
     return args

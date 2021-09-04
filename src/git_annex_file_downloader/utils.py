@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 import hashlib
 import json
@@ -5,7 +7,19 @@ import shlex
 import subprocess
 from concurrent import futures
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Optional, Tuple, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
+
+T = TypeVar("T")
+U = TypeVar("U")
 
 
 def load_json(file_path) -> dict:
@@ -32,6 +46,11 @@ def lookup_key(symlink_path: Path, subfolders: bool = False) -> str:
     return annex_key
 
 
+def lookup_key_from_json(file_path: Path, json_path: Path | str) -> str:
+        mapping = load_json(json_path)
+        return mapping[str(file_path)]
+
+
 def needs_download(file_path: Path, file_size: int) -> bool:
     if file_path.resolve().is_file():
         if file_path.stat().st_size == file_size:
@@ -43,10 +62,6 @@ def needs_download(file_path: Path, file_size: int) -> bool:
 def mkdirs(file_path: Path):
     """Create parent directories and ignore if they already exist."""
     file_path.parent.mkdir(parents=True, exist_ok=True)
-
-
-T = TypeVar("T")
-U = TypeVar("U")
 
 
 def raise_if_none(func: Callable[..., Optional[U]]) -> Callable[..., U]:
@@ -81,6 +96,7 @@ def run_command(
 
 
 def run_command_chain(commands: List[str]) -> str:
+    # needs more type safety
     previous_output = None
     for command in commands:
         previous_output = run_command(command, stdin=previous_output).encode()
@@ -90,13 +106,13 @@ def run_command_chain(commands: List[str]) -> str:
 def map_parallel(
     function: Callable[[U], T],
     iterable: Iterable[U],
-    singleton: Any = None,
-    workers: int = 8,
+    singletons: Iterable[Any] | None = None,
+    workers: int = 4,
 ) -> Iterable[Tuple[Union[str, T], U]]:
     with futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        if singleton is not None:
+        if singletons is not None:
             jobs = {
-                executor.submit(function, param, singleton): param
+                executor.submit(function, param, *singletons): param
                 for param in iterable
             }
         else:

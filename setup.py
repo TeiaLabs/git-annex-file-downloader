@@ -25,7 +25,7 @@ description = (
 
 setuptools.setup(
     name="git-annex-file-downloader",
-    version="0.7.0",
+    version="1.0.0",
     author="Nei Cardoso de Oliveira Neto @ Teia Labs",
     author_email="nei@teialabs.com",
     description=description,
@@ -41,6 +41,6 @@ setuptools.setup(
             'gadown=git_annex_file_downloader.file_downloader:main',
         ],
     },
-    python_requires=">=3.7, <3.9",
+    python_requires=">=3.8, <3.9",
     install_requires=requirements,
 )
