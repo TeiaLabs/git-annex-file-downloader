@@ -1,10 +1,16 @@
 import functools
 import hashlib
+import json
 import shlex
 import subprocess
 from concurrent import futures
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional, Tuple, TypeVar, Union
+
+
+def load_json(file_path) -> dict:
+    with open(file_path) as fh:
+        return json.load(fh)
 
 
 def get_file_size_from_key(annex_file_key: str) -> int:
@@ -29,6 +35,7 @@ def lookup_key(symlink_path: Path, subfolders: bool = False) -> str:
 def needs_download(file_path: Path, file_size: int) -> bool:
     if file_path.resolve().is_file():
         if file_path.stat().st_size == file_size:
+            # TODO check hash
             return False
     return True
 
