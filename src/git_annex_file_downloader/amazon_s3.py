@@ -101,16 +101,20 @@ def get_hmac_cipher(b64_full_cipher: str) -> str:
 
 def get_remotes_config() -> list[str]:
     cmd = f"git show git-annex:remote.log"
-    return run_command(cmd).split("\n")
+    output = run_command(cmd)
+    if output:
+        return output.split("\n")
+    raise ValueError("No remotes found.")
 
 
 def download_file(file_path: Path, no_annex: bool = False):
     """Lookup, download, decrypt."""
-    destination_path = file_path.resolve()
     if no_annex:
+        destination_path = file_path
         annex_key = utils.lookup_key_from_json(file_path, "large_files.json")
     else:
         if file_path.is_symlink():
+            destination_path = file_path.resolve()
             annex_key = utils.lookup_key(file_path)
         else:
             raise ValueError(f"'{file_path}' is not a symlink. Maybe --no-annex?")
